@@ -1,0 +1,378 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  COORDINATOR
+  TEACHER
+  STUDENT
+  PARENT
+  ASSISTANT
+}
+
+enum GradeLevel {
+  FIRST
+  SECOND
+  THIRD
+  FOURTH
+  FIFTH
+}
+
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  CLOSED
+  GRADED
+  ARCHIVED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  SINGLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  LONG_ANSWER
+  MATCHING
+  IMAGE_CHOICE
+  ORDERING
+  FILL_BLANK
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @map("user_id") @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  dni           Int?      @unique
+  emailVerified DateTime? @map("email_verified")
+  password      String?
+  image         String?
+  role          UserRole  @default(STUDENT)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLogin     DateTime? @map("last_login")
+
+  teacherId String? @unique @db.ObjectId
+  studentId String? @unique @db.ObjectId
+
+  teacher       Teacher?       @relation(fields: [teacherId], references: [id])
+  student       Student?       @relation(fields: [studentId], references: [id])
+  createdExams  Exam[]         @relation("ExamCreator")
+  responses     Response[]
+  notifications Notification[]
+  accounts      Account[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Teacher {
+  id             String  @id @default(auto()) @map("_id") @db.ObjectId
+  employeeId     String  @unique
+  specialization String?
+  user           User?
+
+  yearsExperience Int?
+  education       String?
+  certifications  String[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  classroomTeacher Classroom[]
+  coursesTeaching  TeacherCourse[]
+  createdExams     Exam[]
+
+  @@map("teachers")
+}
+
+model Student {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  studentId   String   @unique
+  dateOfBirth DateTime
+  user        User?
+
+  classroomId      String?    @db.ObjectId
+  classroom        Classroom? @relation(fields: [classroomId], references: [id])
+  studentResponses Response[] @relation("StudentResponses")
+  studentGrades    Grade[]    @relation("StudentGrades")
+
+  parentName       String?
+  parentContact    String?
+  address          String?
+  emergencyContact String?
+  medicalInfo      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("students")
+}
+
+model Classroom {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  gradeLevel GradeLevel
+  year       Int
+  capacity   Int
+
+  teacherId String    @db.ObjectId
+  teacher   Teacher   @relation(fields: [teacherId], references: [id])
+  students  Student[]
+
+  classroomCourses ClassroomCourse[]
+  classroomExams   ClassroomExam[]
+
+  schedule    Json?
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("classrooms")
+}
+
+model Course {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  code        String  @unique
+  description String?
+
+  teacherCourses   TeacherCourse[]
+  classroomCourses ClassroomCourse[]
+  courseExams      Exam[]
+
+  syllabus     String?
+  objectives   String[]
+  requirements String[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("courses")
+}
+
+model TeacherCourse {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  teacherId String @db.ObjectId
+  courseId  String @db.ObjectId
+
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  course  Course  @relation(fields: [courseId], references: [id])
+
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  @@unique([teacherId, courseId])
+  @@map("teacher_courses")
+}
+
+model ClassroomCourse {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  classroomId String @db.ObjectId
+  courseId    String @db.ObjectId
+
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+  course    Course    @relation(fields: [courseId], references: [id])
+
+  schedule  Json?
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
+  @@unique([classroomId, courseId])
+  @@map("classroom_courses")
+}
+
+model ClassroomExam {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  classroomId String @db.ObjectId
+  examId      String @db.ObjectId
+
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+  exam      Exam      @relation(fields: [examId], references: [id])
+
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+  dueDate    DateTime? @map("due_date")
+
+  @@unique([classroomId, examId])
+  @@map("classroom_exams")
+}
+
+model Exam {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  status      ExamStatus @default(DRAFT)
+
+  timeLimit        Int?      @map("time_limit")
+  passingScore     Float?    @map("passing_score")
+  shuffleQuestions Boolean   @default(false) @map("shuffle_questions")
+  allowReview      Boolean   @default(true) @map("allow_review")
+  showResults      Boolean   @default(true) @map("show_results")
+  startDate        DateTime? @map("start_date")
+  endDate          DateTime? @map("end_date")
+
+  creatorId String @map("creator_id") @db.ObjectId
+  teacherId String @map("teacher_id") @db.ObjectId
+  courseId  String @map("course_id") @db.ObjectId
+
+  creator User    @relation("ExamCreator", fields: [creatorId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  course  Course  @relation(fields: [courseId], references: [id])
+
+  classroomExams ClassroomExam[]
+  questions      Question[]
+  examResponses  Response[]
+  examGrades     Grade[]
+
+  totalPoints  Float    @map("total_points")
+  averageScore Float?   @map("average_score")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("exams")
+}
+
+// Continúa para los demás modelos...
+model Question {
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  examId          String       @map("exam_id") @db.ObjectId
+  type            QuestionType
+  text            String
+  points          Float
+  order           Int
+  imageUrl        String?      @map("image_url")
+  audioUrl        String?      @map("audio_url")
+  options         Json?
+  correctAnswer   String?      @map("correct_answer")
+  explanation     String?
+  required        Boolean      @default(true)
+  showExplanation Boolean      @default(false) @map("show_explanation")
+
+  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers   Answer[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("questions")
+}
+
+model Response {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  examId     String    @map("exam_id") @db.ObjectId
+  studentId  String    @map("student_id") @db.ObjectId
+  startTime  DateTime  @default(now()) @map("start_time")
+  submitTime DateTime? @map("submit_time")
+  timeSpent  Int?      @map("time_spent")
+
+  exam            Exam     @relation(fields: [examId], references: [id])
+  student         User     @relation(fields: [studentId], references: [id])
+  studentResponse Student  @relation("StudentResponses", fields: [studentId], references: [id])
+  answers         Answer[]
+  responseGrade   Grade?   @relation("ResponseGrade")
+
+  completed Boolean  @default(false)
+  validated Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("responses")
+}
+
+model Answer {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  responseId String   @map("response_id") @db.ObjectId
+  questionId String   @map("question_id") @db.ObjectId
+  value      String
+  isCorrect  Boolean? @map("is_correct")
+  points     Float?
+  feedback   String?
+
+  response  Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question  Question @relation(fields: [questionId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("answers")
+}
+
+model Grade {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  examId     String   @map("exam_id") @db.ObjectId
+  studentId  String   @map("student_id") @db.ObjectId
+  responseId String   @unique @map("response_id") @db.ObjectId
+  score      Float
+  feedback   String?
+  status     String
+  gradeDate  DateTime @default(now()) @map("grade_date")
+
+  exam     Exam     @relation(fields: [examId], references: [id])
+  student  Student  @relation("StudentGrades", fields: [studentId], references: [id])
+  response Response @relation("ResponseGrade", fields: [responseId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("grades")
+}
+
+model Notification {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId  String  @map("user_id") @db.ObjectId
+  title   String
+  message String
+  type    String
+  read    Boolean @default(false)
+
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
