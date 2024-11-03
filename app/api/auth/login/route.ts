@@ -14,8 +14,8 @@ const loginSchema = z.object({
   }),
 })
 
-// Función principal de login
-async function handleLogin(req: Request) {
+// Función principal de login con tipo de retorno específico
+async function handleLogin(req: Request): Promise<NextResponse> {
   console.log("🟢 API: Inicio de solicitud POST /api/auth/login");
   
   console.log("🟡 API: Intentando leer el body de la solicitud");
@@ -101,16 +101,17 @@ async function handleLogin(req: Request) {
   })
 }
 
-export async function POST(req: Request) {
+// Route handler con tipo de retorno específico
+export async function POST(req: Request): Promise<NextResponse> {
   try {
     // Crear una promesa con timeout
     const loginWithTimeout = Promise.race([
       handleLogin(req),
-      new Promise((_, reject) => 
+      new Promise<NextResponse>((_, reject) => 
         setTimeout(() => {
           console.log("⏰ API: Timeout alcanzado");
           reject(new Error('Timeout'))
-        }, 8000) // 8 segundos de timeout
+        }, 8000)
       )
     ]);
 
