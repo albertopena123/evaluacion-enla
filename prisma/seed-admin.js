@@ -9,7 +9,7 @@ async function main() {
     // Verificar si el admin ya existe
     const existingAdmin = await prisma.user.findUnique({
       where: {
-        email: 'admin@escuela.com',
+        email: 'escuela@escuela.com',
       },
     });
 
@@ -23,10 +23,11 @@ async function main() {
     
     const admin = await prisma.user.create({
       data: {
-        email: 'admin@escuela.com',
+        email: 'escuela@escuela.com',
         name: 'Administrador',
         password: adminPassword,
         role: 'ADMIN',
+        dni:77493318,
         active: true,
       },
     });
