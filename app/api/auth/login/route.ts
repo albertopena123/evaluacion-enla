@@ -16,7 +16,7 @@ const loginSchema = z.object({
 
 // Función principal de login con tipo de retorno específico
 async function handleLogin(req: Request): Promise<NextResponse> {
-  console.log("🟢 API: Inicio de solicitud POST /api/auth/login");
+  console.log("🟢 API: Inicio alberto de solicitud POST /api/auth/login");
   
   console.log("🟡 API: Intentando leer el body de la solicitud");
   const body = await req.json()
